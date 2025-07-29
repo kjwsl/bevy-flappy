@@ -1,0 +1,10 @@
+[package]
+name = "bevy-flappy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = "0.16.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+bevy = { version = "0.16.1", default-features = true, features = ["x11"]}
