@@ -1,20 +1,29 @@
-use bevy::{input::keyboard::KeyboardInput, prelude::*};
+use bevy::prelude::*;
 
 use crate::main_menu::AppState;
 
 pub const BG_IMG_DIMENSIONS: (f32, f32) = (288.0, 512.0);
 pub const BG_SPRITE_PATH: &str = "sprites/background-day.png";
+pub const PLATFORM_SPRITE_PATH: &str = "sprites/base.png";
 
-const BG_SPEED: f32 = 1.0;
+const Z_POS_BG: f32 = -10.0;
+const Z_POS_PLATFORM: f32 = -3.0;
+const Z_POS_PLAYER: f32 = 10.0;
 
-const GRAVITY: f32 = -2000.0;
-const JUMP_IMPULSE: f32 = 500.0;
+const BG_SPEED: f32 = 0.4;
+const PLATFORM_SPEED: f32 = 1.0;
+
+const GRAVITY: f32 = -700.0;
+const JUMP_IMPULSE: f32 = 300.0;
 const MAX_FALL_SPEED: f32 = -700.0;
 
 pub struct GamePlugin;
 
 #[derive(Component)]
 pub struct BackgroundImage;
+
+#[derive(Component)]
+pub struct PlatformImage;
 
 #[derive(Component)]
 pub struct Player;
@@ -32,7 +41,10 @@ struct BirdTextures {
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(OnEnter(AppState::InGame), setup)
-            .add_systems(Update, (move_bg, apply_gravity, handle_jump_input).run_if(in_state(AppState::InGame)));
+            .add_systems(
+                Update,
+                (move_bg, apply_gravity, handle_jump_input).run_if(in_state(AppState::InGame)),
+            );
     }
 }
 
@@ -56,7 +68,7 @@ fn spawn_player(commands: &mut Commands, bird_textures: &BirdTextures) {
             ..default()
         },
         Transform {
-            translation: Vec3::new(-150.0, 0.0, 0.0),
+            translation: Vec3::new(-150.0, 0.0, Z_POS_PLAYER),
             scale: Vec3::new(1.0, 1.0, 1.0),
             ..default()
         },
@@ -68,6 +80,7 @@ fn spawn_player(commands: &mut Commands, bird_textures: &BirdTextures) {
 
 fn create_bg(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     let bg_handle = asset_server.load(BG_SPRITE_PATH);
+    let base_handle = asset_server.load(PLATFORM_SPRITE_PATH);
 
     for i in -1..=2 {
         commands.spawn((
@@ -77,19 +90,44 @@ fn create_bg(commands: &mut Commands, asset_server: &Res<AssetServer>) {
                 ..default()
             },
             Transform {
-                translation: Vec3::new(i as f32 * BG_IMG_DIMENSIONS.0, 0.0, 0.0),
+                translation: Vec3::new(i as f32 * BG_IMG_DIMENSIONS.0, 0.0, Z_POS_BG),
                 scale: Vec3::new(1.0, 1.0, 1.0),
                 ..default()
             },
             GlobalTransform::default(),
             BackgroundImage,
         ));
+
+        commands.spawn((
+            Sprite {
+                image: base_handle.clone(),
+                ..default()
+            },
+            Transform {
+                translation: Vec3::new(i as f32 * BG_IMG_DIMENSIONS.0, -250.0, Z_POS_PLATFORM),
+                scale: Vec3::new(1.0, 1.0, 1.0),
+                ..default()
+            },
+            GlobalTransform::default(),
+            PlatformImage,
+        ));
     }
 }
 
-fn move_bg(mut bg_query: Query<&mut Transform, With<BackgroundImage>>) {
+fn move_bg(
+    mut bg_query: Query<&mut Transform, With<BackgroundImage>>,
+    mut platform_query: Query<&mut Transform, (With<PlatformImage>, Without<BackgroundImage>)>,
+) {
     for mut transform in &mut bg_query {
         transform.translation.x -= BG_SPEED;
+
+        if transform.translation.x < -BG_IMG_DIMENSIONS.0 * 1.5 {
+            transform.translation.x = BG_IMG_DIMENSIONS.0 * 1.5;
+        }
+    }
+
+    for mut transform in &mut platform_query {
+        transform.translation.x -= PLATFORM_SPEED;
 
         if transform.translation.x < -BG_IMG_DIMENSIONS.0 * 1.5 {
             transform.translation.x = BG_IMG_DIMENSIONS.0 * 1.5;
