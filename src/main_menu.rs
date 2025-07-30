@@ -47,8 +47,8 @@ fn setup(mut commands: Commands) {
         (
             Button,
             Node {
-                width: Val::Px(400.0),
-                height: Val::Px(100.0),
+                width: Val::Percent(40.0),
+                height: Val::Percent(15.0),
                 margin: UiRect::all(Val::Px(10.0)),
                 padding: UiRect::all(Val::Px(10.0)),
                 justify_content: JustifyContent::Center,
@@ -88,7 +88,11 @@ fn setup(mut commands: Commands) {
         BackgroundColor(MENU_BG_COLOR),
         children![(
             Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::End,
+                margin: UiRect::bottom(Val::Px(50.0)), 
                 align_items: AlignItems::Center,
                 ..default()
             },
