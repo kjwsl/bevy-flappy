@@ -66,16 +66,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         mid: asset_server.load("sprites/yellowbird-midflap.png"),
         down: asset_server.load("sprites/yellowbird-downflap.png"),
     };
-    let root = commands
-        .spawn((
-            GameScene,
-            Node {
-                width: Val::Percent(100.),
-                height: Val::Percent(100.),
-                ..default()
-            },
-        ))
-        .id();
+    let root = commands.spawn((GameScene, Transform::default())).id();
 
     commands.entity(root).with_children(|parent| {
         // Player
@@ -87,7 +78,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             Transform::from_xyz(-150., 0., Z_POS_PLAYER),
             Velocity(0.),
             Player,
-            GlobalTransform::default(),
         ));
 
         // Background & Platform
@@ -100,7 +90,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 },
                 Transform::from_xyz(i as f32 * BG_IMG_DIMENSIONS.0, 0., Z_POS_BG),
                 BackgroundImage,
-                GlobalTransform::default(),
             ));
             parent.spawn((
                 Sprite {
@@ -109,7 +98,6 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 },
                 Transform::from_xyz(i as f32 * BG_IMG_DIMENSIONS.0, -250., Z_POS_PLATFORM),
                 PlatformImage,
-                GlobalTransform::default(),
             ));
         }
     });
