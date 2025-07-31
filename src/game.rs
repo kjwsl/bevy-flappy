@@ -27,6 +27,9 @@ const MAX_FALL_SPEED: f32 = -700.0;
 pub struct GamePlugin;
 
 #[derive(Component)]
+pub struct GameScene;
+
+#[derive(Component)]
 pub struct BackgroundImage;
 
 #[derive(Component)]
@@ -52,7 +55,8 @@ impl Plugin for GamePlugin {
                 Update,
                 (move_bg, apply_gravity, handle_jump_input, detect_gameover)
                     .run_if(in_state(AppState::InGame)),
-            );
+            )
+            .add_systems(OnExit(AppState::InGame), cleanup);
     }
 }
 
@@ -62,8 +66,53 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         mid: asset_server.load("sprites/yellowbird-midflap.png"),
         down: asset_server.load("sprites/yellowbird-downflap.png"),
     };
-    spawn_player(&mut commands, &textures);
-    create_bg(&mut commands, &asset_server);
+    let root = commands
+        .spawn((
+            GameScene,
+            Node {
+                width: Val::Percent(100.),
+                height: Val::Percent(100.),
+                ..default()
+            },
+        ))
+        .id();
+
+    commands.entity(root).with_children(|parent| {
+        // Player
+        parent.spawn((
+            Sprite {
+                image: textures.up.clone(),
+                ..default()
+            },
+            Transform::from_xyz(-150., 0., Z_POS_PLAYER),
+            Velocity(0.),
+            Player,
+            GlobalTransform::default(),
+        ));
+
+        // Background & Platform
+        for i in -1..=2 {
+            parent.spawn((
+                Sprite {
+                    image: asset_server.load(BG_SPRITE_PATH),
+                    custom_size: Some(Vec2::new(BG_IMG_DIMENSIONS.0, BG_IMG_DIMENSIONS.1)),
+                    ..default()
+                },
+                Transform::from_xyz(i as f32 * BG_IMG_DIMENSIONS.0, 0., Z_POS_BG),
+                BackgroundImage,
+                GlobalTransform::default(),
+            ));
+            parent.spawn((
+                Sprite {
+                    image: asset_server.load(PLATFORM_SPRITE_PATH),
+                    ..default()
+                },
+                Transform::from_xyz(i as f32 * BG_IMG_DIMENSIONS.0, -250., Z_POS_PLATFORM),
+                PlatformImage,
+                GlobalTransform::default(),
+            ));
+        }
+    });
 
     commands.insert_resource(textures);
 }
@@ -76,60 +125,6 @@ fn detect_gameover(
         if transform.translation.y < -BG_IMG_DIMENSIONS.1 / 2.0 - 30.0 {
             app_state.set(AppState::GameOver);
         }
-    }
-}
-
-fn spawn_player(commands: &mut Commands, bird_textures: &BirdTextures) {
-    let player_asset = bird_textures.mid.clone();
-    commands.spawn((
-        Sprite {
-            image: player_asset,
-            ..default()
-        },
-        Transform {
-            translation: Vec3::new(-150.0, 0.0, Z_POS_PLAYER),
-            scale: Vec3::new(1.0, 1.0, 1.0),
-            ..default()
-        },
-        Velocity(0.0),
-        GlobalTransform::default(),
-        Player,
-    ));
-}
-
-fn create_bg(commands: &mut Commands, asset_server: &Res<AssetServer>) {
-    let bg_handle = asset_server.load(BG_SPRITE_PATH);
-    let base_handle = asset_server.load(PLATFORM_SPRITE_PATH);
-
-    for i in -1..=2 {
-        commands.spawn((
-            Sprite {
-                image: bg_handle.clone(),
-                custom_size: Some(Vec2::new(BG_IMG_DIMENSIONS.0, BG_IMG_DIMENSIONS.1)),
-                ..default()
-            },
-            Transform {
-                translation: Vec3::new(i as f32 * BG_IMG_DIMENSIONS.0, 0.0, Z_POS_BG),
-                scale: Vec3::new(1.0, 1.0, 1.0),
-                ..default()
-            },
-            GlobalTransform::default(),
-            BackgroundImage,
-        ));
-
-        commands.spawn((
-            Sprite {
-                image: base_handle.clone(),
-                ..default()
-            },
-            Transform {
-                translation: Vec3::new(i as f32 * BG_IMG_DIMENSIONS.0, -250.0, Z_POS_PLATFORM),
-                scale: Vec3::new(1.0, 1.0, 1.0),
-                ..default()
-            },
-            GlobalTransform::default(),
-            PlatformImage,
-        ));
     }
 }
 
@@ -183,5 +178,11 @@ fn handle_jump_input(
         for mut velocity in &mut player_query {
             *velocity = Velocity(JUMP_IMPULSE)
         }
+    }
+}
+
+fn cleanup(mut commands: Commands, query: Query<Entity, With<GameScene>>) {
+    for entity in &query {
+        commands.entity(entity).despawn();
     }
 }
