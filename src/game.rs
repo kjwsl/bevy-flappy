@@ -1,6 +1,13 @@
 use bevy::prelude::*;
 
-use crate::main_menu::AppState;
+#[derive(States, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]
+pub enum AppState {
+    #[default]
+    MainMenu,
+    InGame,
+    GameOver,
+    Settings,
+}
 
 pub const BG_IMG_DIMENSIONS: (f32, f32) = (288.0, 512.0);
 pub const BG_SPRITE_PATH: &str = "sprites/background-day.png";
@@ -43,7 +50,8 @@ impl Plugin for GamePlugin {
         app.add_systems(OnEnter(AppState::InGame), setup)
             .add_systems(
                 Update,
-                (move_bg, apply_gravity, handle_jump_input).run_if(in_state(AppState::InGame)),
+                (move_bg, apply_gravity, handle_jump_input, detect_gameover)
+                    .run_if(in_state(AppState::InGame)),
             );
     }
 }
@@ -58,6 +66,17 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     create_bg(&mut commands, &asset_server);
 
     commands.insert_resource(textures);
+}
+
+fn detect_gameover(
+    player_query: Query<&Transform, With<Player>>,
+    mut app_state: ResMut<NextState<AppState>>,
+) {
+    if let Ok(transform) = player_query.single() {
+        if transform.translation.y < -BG_IMG_DIMENSIONS.1 / 2.0 - 30.0 {
+            app_state.set(AppState::GameOver);
+        }
+    }
 }
 
 fn spawn_player(commands: &mut Commands, bird_textures: &BirdTextures) {
