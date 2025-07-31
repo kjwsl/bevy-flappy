@@ -111,15 +111,12 @@ fn handle_input(
 
                 match button_type {
                     MenuButton::Play => {
-                        println!("Play");
                         app_state.set(AppState::InGame);
                     }
                     MenuButton::Settings => {
-                        println!("Settings");
                         app_state.set(AppState::Settings);
                     }
                     MenuButton::Quit => {
-                        println!("Quit");
                         exit.write(AppExit::Success);
                     }
                 }

@@ -141,6 +141,7 @@ fn move_bg(
     mut bg_query: Query<&mut Transform, With<BackgroundImage>>,
     mut platform_query: Query<&mut Transform, (With<PlatformImage>, Without<BackgroundImage>)>,
 ) {
+    // Move background
     for mut transform in &mut bg_query {
         transform.translation.x -= BG_SPEED;
 
@@ -149,6 +150,7 @@ fn move_bg(
         }
     }
 
+    // Move platform
     for mut transform in &mut platform_query {
         transform.translation.x -= PLATFORM_SPEED;
 
@@ -183,6 +185,7 @@ fn handle_jump_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<&mut Velocity, With<Player>>,
 ) {
+    // Jump
     if keyboard.just_pressed(KeyCode::Space) {
         for mut velocity in &mut player_query {
             *velocity = Velocity(JUMP_IMPULSE)
@@ -205,6 +208,7 @@ fn setup_gameover(mut commands: Commands) {
         GameOverLayer,
         children![
             (
+                // Game over label
                 Node {
                     margin: UiRect::top(Val::Px(100.0)),
                     ..default()
@@ -217,6 +221,7 @@ fn setup_gameover(mut commands: Commands) {
                 }
             ),
             (
+                // Buttons
                 Node {
                     width: Val::Percent(100.),
                     height: Val::Percent(100.),
@@ -227,6 +232,7 @@ fn setup_gameover(mut commands: Commands) {
                 },
                 children![
                     (
+                        // Main menu
                         Node {
                             width: Val::Percent(30.),
                             height: Val::Percent(20.),
@@ -241,6 +247,7 @@ fn setup_gameover(mut commands: Commands) {
                         children![Text("Main Menu".to_string())],
                     ),
                     (
+                        // Retry
                         Node {
                             width: Val::Percent(30.),
                             height: Val::Percent(20.),
@@ -260,11 +267,19 @@ fn setup_gameover(mut commands: Commands) {
     ));
 }
 
+type QueryButton<'w, 's, 'a> = Query<
+    'w,
+    's,
+    (
+        &'a Interaction,
+        &'a GameOverMenuButton,
+        &'a mut BackgroundColor,
+    ),
+    (With<Button>, Changed<Interaction>),
+>;
+
 fn handle_gameover_menu_button(
-    mut button_query: Query<
-        (&Interaction, &GameOverMenuButton, &mut BackgroundColor),
-        (With<Button>, Changed<Interaction>),
-    >,
+    mut button_query: QueryButton,
     mut app_state: ResMut<NextState<AppState>>,
 ) {
     for (interaction, button, mut color) in &mut button_query {

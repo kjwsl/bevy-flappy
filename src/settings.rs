@@ -74,7 +74,6 @@ fn handle_input(mut interaction_query: QueryButton, mut app_state: ResMut<NextSt
             Interaction::Pressed => {
                 match button_type {
                     SettingsOption::Back => {
-                        println!("Back");
                         app_state.set(AppState::MainMenu);
                     }
                 }
