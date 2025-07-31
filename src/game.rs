@@ -1,4 +1,5 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, text::LineHeight};
+use bevy_flappy_macros::hex_to_color;
 
 #[derive(States, Debug, Clone, Copy, Default, Eq, PartialEq, Hash)]
 pub enum AppState {
@@ -9,6 +10,10 @@ pub enum AppState {
     Settings,
 }
 
+pub const BUTTON_COLOR_IDLE: Color = hex_to_color!("#E5E5E5");
+pub const BUTTON_COLOR_HOVER: Color = hex_to_color!("#D3D3D3");
+pub const BUTTON_COLOR_PRESSED: Color = hex_to_color!("#A9A9A9");
+
 pub const BG_IMG_DIMENSIONS: (f32, f32) = (288.0, 512.0);
 pub const BG_SPRITE_PATH: &str = "sprites/background-day.png";
 pub const PLATFORM_SPRITE_PATH: &str = "sprites/base.png";
@@ -17,17 +22,26 @@ const Z_POS_BG: f32 = -10.0;
 const Z_POS_PLATFORM: f32 = -3.0;
 const Z_POS_PLAYER: f32 = 10.0;
 
-const BG_SPEED: f32 = 0.4;
+const BG_SPEED: f32 = 0.2;
 const PLATFORM_SPEED: f32 = 1.0;
 
 const GRAVITY: f32 = -700.0;
 const JUMP_IMPULSE: f32 = 300.0;
 const MAX_FALL_SPEED: f32 = -700.0;
 
+#[derive(Component)]
+pub enum GameOverMenuButton {
+    Retry,
+    MainMenu,
+}
+
 pub struct GamePlugin;
 
 #[derive(Component)]
 pub struct GameScene;
+
+#[derive(Component)]
+pub struct GameOverLayer;
 
 #[derive(Component)]
 pub struct BackgroundImage;
@@ -56,7 +70,12 @@ impl Plugin for GamePlugin {
                 (move_bg, apply_gravity, handle_jump_input, detect_gameover)
                     .run_if(in_state(AppState::InGame)),
             )
-            .add_systems(OnExit(AppState::InGame), cleanup);
+            .add_systems(OnEnter(AppState::GameOver), setup_gameover)
+            .add_systems(
+                Update,
+                (handle_gameover_menu_button).run_if(in_state(AppState::GameOver)),
+            )
+            .add_systems(OnExit(AppState::GameOver), cleanup);
     }
 }
 
@@ -66,7 +85,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         mid: asset_server.load("sprites/yellowbird-midflap.png"),
         down: asset_server.load("sprites/yellowbird-downflap.png"),
     };
-    let root = commands.spawn((GameScene, Transform::default())).id();
+    let root = commands
+        .spawn((GameScene, Transform::default(), Visibility::Visible))
+        .id();
 
     commands.entity(root).with_children(|parent| {
         // Player
@@ -75,7 +96,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 image: textures.up.clone(),
                 ..default()
             },
-            Transform::from_xyz(-150., 0., Z_POS_PLAYER),
+            Transform::from_xyz(-150., 70., Z_POS_PLAYER),
             Velocity(0.),
             Player,
         ));
@@ -169,8 +190,117 @@ fn handle_jump_input(
     }
 }
 
-fn cleanup(mut commands: Commands, query: Query<Entity, With<GameScene>>) {
-    for entity in &query {
+fn setup_gameover(mut commands: Commands) {
+    commands.spawn((
+        Node {
+            width: Val::Percent(100.),
+            height: Val::Percent(100.),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            flex_direction: FlexDirection::Column,
+            ..default()
+        },
+        // Transform::from_xyz(0., 0., Z_POS_GAMEOVER),
+        BackgroundColor(Color::srgba(0., 0., 0., 0.8)),
+        GameOverLayer,
+        children![
+            (
+                Node {
+                    margin: UiRect::top(Val::Px(100.0)),
+                    ..default()
+                },
+                Text("Game Over".to_string()),
+                TextFont {
+                    font_size: 70.0,
+                    line_height: LineHeight::RelativeToFont(2.0),
+                    ..default()
+                }
+            ),
+            (
+                Node {
+                    width: Val::Percent(100.),
+                    height: Val::Percent(100.),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    flex_direction: FlexDirection::Row,
+                    ..default()
+                },
+                children![
+                    (
+                        Node {
+                            width: Val::Percent(30.),
+                            height: Val::Percent(20.),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            margin: UiRect::all(Val::Px(10.0)),
+                            ..default()
+                        },
+                        Button,
+                        BackgroundColor(BUTTON_COLOR_IDLE),
+                        GameOverMenuButton::MainMenu,
+                        children![Text("Main Menu".to_string())],
+                    ),
+                    (
+                        Node {
+                            width: Val::Percent(30.),
+                            height: Val::Percent(20.),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            margin: UiRect::all(Val::Px(10.0)),
+                            ..default()
+                        },
+                        Button,
+                        BackgroundColor(BUTTON_COLOR_IDLE),
+                        GameOverMenuButton::Retry,
+                        children![Text("Retry".to_string())],
+                    ),
+                ]
+            )
+        ],
+    ));
+}
+
+fn handle_gameover_menu_button(
+    mut button_query: Query<
+        (&Interaction, &GameOverMenuButton, &mut BackgroundColor),
+        (With<Button>, Changed<Interaction>),
+    >,
+    mut app_state: ResMut<NextState<AppState>>,
+) {
+    for (interaction, button, mut color) in &mut button_query {
+        match *interaction {
+            Interaction::Pressed => {
+                *color = BackgroundColor(BUTTON_COLOR_PRESSED);
+
+                match button {
+                    GameOverMenuButton::MainMenu => {
+                        app_state.set(AppState::MainMenu);
+                    }
+                    GameOverMenuButton::Retry => {
+                        app_state.set(AppState::InGame);
+                    }
+                }
+            }
+            Interaction::Hovered => {
+                *color = BackgroundColor(BUTTON_COLOR_HOVER);
+            }
+            Interaction::None => {
+                *color = BackgroundColor(BUTTON_COLOR_IDLE);
+            }
+        }
+    }
+}
+
+fn cleanup(
+    mut commands: Commands,
+    game_query: Query<Entity, With<GameScene>>,
+    game_over_query: Query<Entity, With<GameOverLayer>>,
+) {
+    for entity in &game_query {
+        commands.entity(entity).despawn();
+    }
+
+    for entity in &game_over_query {
         commands.entity(entity).despawn();
     }
 }
