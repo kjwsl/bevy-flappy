@@ -10,6 +10,8 @@ pub enum AppState {
     Settings,
 }
 
+pub const GAME_DIMENSIONS: (f32, f32) = (BG_IMG_DIMENSIONS.0 * 2.0, BG_IMG_DIMENSIONS.1);
+
 pub const BUTTON_COLOR_IDLE: Color = hex_to_color!("#E5E5E5");
 pub const BUTTON_COLOR_HOVER: Color = hex_to_color!("#D3D3D3");
 pub const BUTTON_COLOR_PRESSED: Color = hex_to_color!("#A9A9A9");
@@ -28,6 +30,7 @@ const PLATFORM_SPEED: f32 = 1.0;
 const GRAVITY: f32 = -700.0;
 const JUMP_IMPULSE: f32 = 300.0;
 const MAX_FALL_SPEED: f32 = -700.0;
+const MAX_HEIGHT: f32 = GAME_DIMENSIONS.1 / 2.0;
 
 #[derive(Component)]
 pub enum GameOverMenuButton {
@@ -170,6 +173,11 @@ fn apply_gravity(
         **velocity = (**velocity).max(MAX_FALL_SPEED);
 
         transform.translation.y += **velocity * time.delta_secs();
+
+        if transform.translation.y > MAX_HEIGHT {
+            transform.translation.y = MAX_HEIGHT;
+            **velocity = 0.0;
+        }
 
         sprite.image = if **velocity > 150.0 {
             textures.up.clone()

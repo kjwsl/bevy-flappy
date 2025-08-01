@@ -1,11 +1,9 @@
 use bevy::{prelude::*, window::EnabledButtons};
 use bevy_flappy::{
-    game::{BG_IMG_DIMENSIONS, GamePlugin},
+    game::{GAME_DIMENSIONS, GamePlugin},
     main_menu::MainMenuPlugin,
     settings::SettingsPlugin,
 };
-
-pub const GAME_DIMENSIONS: (f32, f32) = (BG_IMG_DIMENSIONS.0 * 2.0, BG_IMG_DIMENSIONS.1);
 
 fn main() {
     App::new()
