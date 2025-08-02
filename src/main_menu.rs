@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 use bevy_flappy_macros::hex_to_color;
 
+use crate::game::AppState;
+
 const MENU_BG_COLOR: Color = hex_to_color!("#e4ede6");
 const BUTTON_COLOR_IDLE: Color = hex_to_color!("#c3d8d2");
 const BUTTON_COLOR_HOVER: Color = hex_to_color!("#f4f5f4");
@@ -15,14 +17,6 @@ type QueryButton<'w, 's, 'a> = Query<
 
 #[derive(Component)]
 pub struct MainMenu;
-
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
-pub enum AppState {
-    #[default]
-    MainMenu,
-    InGame,
-    Settings,
-}
 
 #[derive(Component, Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum MenuButton {
@@ -47,8 +41,8 @@ fn setup(mut commands: Commands) {
         (
             Button,
             Node {
-                width: Val::Px(400.0),
-                height: Val::Px(100.0),
+                width: Val::Percent(40.0),
+                height: Val::Percent(15.0),
                 margin: UiRect::all(Val::Px(10.0)),
                 padding: UiRect::all(Val::Px(10.0)),
                 justify_content: JustifyContent::Center,
@@ -88,7 +82,11 @@ fn setup(mut commands: Commands) {
         BackgroundColor(MENU_BG_COLOR),
         children![(
             Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::End,
+                margin: UiRect::bottom(Val::Px(50.0)),
                 align_items: AlignItems::Center,
                 ..default()
             },
@@ -113,15 +111,12 @@ fn handle_input(
 
                 match button_type {
                     MenuButton::Play => {
-                        println!("Play");
                         app_state.set(AppState::InGame);
                     }
                     MenuButton::Settings => {
-                        println!("Settings");
                         app_state.set(AppState::Settings);
                     }
                     MenuButton::Quit => {
-                        println!("Quit");
                         exit.write(AppExit::Success);
                     }
                 }

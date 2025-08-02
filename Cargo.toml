@@ -5,7 +5,5 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.16.1"
+rand = "0.9"
 bevy-flappy-macros = { path = "./bevy-flappy-macros" }
-
-[target.'cfg(target_os = "linux")'.dependencies]
-bevy = { version = "0.16.1", default-features = true, features = ["x11"]}
