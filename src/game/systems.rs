@@ -4,7 +4,7 @@ use crate::game::{
     components::*,
     events::AudioEvent,
     collision::check_collision,
-    audio::play_audio_events,
+    audio::{play_audio_events, play_background_music, stop_background_music},
     player::{apply_gravity, handle_jump_input, detect_gameover},
     pipes::{generate_pipes, move_pipes, destroy_pipes},
     score::update_score,
@@ -18,7 +18,7 @@ impl Plugin for GamePlugin {
         app.insert_resource(PipeInterval::default())
             .insert_resource(Score::default())
             .add_event::<AudioEvent>()
-            .add_systems(OnEnter(AppState::InGame), (setup, setup_ui))
+            .add_systems(OnEnter(AppState::InGame), (setup, setup_ui, play_background_music))
             .add_systems(
                 Update,
                 (
@@ -35,6 +35,7 @@ impl Plugin for GamePlugin {
                 )
                     .run_if(in_state(AppState::InGame)),
             )
+            .add_systems(OnExit(AppState::InGame), stop_background_music)
             .add_systems(OnEnter(AppState::GameOver), setup_gameover)
             .add_systems(
                 Update,
