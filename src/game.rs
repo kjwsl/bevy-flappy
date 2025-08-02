@@ -54,6 +54,14 @@ const PLAYER_COLLISION_HEIGHT: f32 = 24.0;
 const PIPE_COLLISION_WIDTH: f32 = 52.0;
 const PIPE_COLLISION_HEIGHT: f32 = 320.0;
 
+#[derive(Event)]
+enum AudioEvent {
+    Wing,
+    Point,
+    Hit,
+    Die,
+}
+
 #[derive(Resource)]
 pub struct PipeInterval(Timer);
 
@@ -72,6 +80,14 @@ impl Default for PipeInterval {
     }
 }
 
+#[derive(Resource)]
+struct GameSounds {
+    wing: Handle<AudioSource>,
+    point: Handle<AudioSource>,
+    hit: Handle<AudioSource>,
+    die: Handle<AudioSource>,
+}
+
 #[derive(Component)]
 pub enum GameOverMenuButton {
     Retry,
@@ -84,6 +100,7 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PipeInterval::default())
             .insert_resource(Score::default())
+            .add_event::<AudioEvent>()
             .add_systems(OnEnter(AppState::InGame), (setup, setup_ui))
             .add_systems(
                 Update,
@@ -97,6 +114,7 @@ impl Plugin for GamePlugin {
                     move_pipes,
                     destory_pipes,
                     update_score,
+                    play_audio_events,
                 )
                     .run_if(in_state(AppState::InGame)),
             )
@@ -172,10 +190,18 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, score: ResMut<S
         red_pipe: asset_server.load("sprites/pipe-red.png"),
     };
 
+    let game_sounds = GameSounds {
+        wing: asset_server.load("audio/wing.ogg"),
+        point: asset_server.load("audio/point.ogg"),
+        hit: asset_server.load("audio/hit.ogg"),
+        die: asset_server.load("audio/die.ogg"),
+    };
+
     let bird_image = bird_textures.up.clone();
 
     commands.insert_resource(bird_textures);
     commands.insert_resource(pipe_texture);
+    commands.insert_resource(game_sounds);
 
     let root = commands
         .spawn((GameWorld, Transform::default(), Visibility::Visible))
@@ -259,11 +285,14 @@ fn detect_collisions(
     player_query: Single<&GlobalTransform, (With<Player>, With<Collider>)>,
     pipe_query: Query<&GlobalTransform, (With<Pipe>, With<Collider>)>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut audio_events: EventWriter<AudioEvent>,
 ) {
     let player_transform = player_query.into_inner();
 
     for pipe_transform in &pipe_query {
         if check_collision(player_transform, pipe_transform) {
+            // Send hit sound event
+            audio_events.write(AudioEvent::Hit);
             app_state.set(AppState::GameOver);
             return;
         }
@@ -292,10 +321,13 @@ fn check_collision(player_transform: &GlobalTransform, pipe_transform: &GlobalTr
 fn detect_gameover(
     player_query: Single<&Transform, With<Player>>,
     mut app_state: ResMut<NextState<AppState>>,
+    mut audio_events: EventWriter<AudioEvent>,
 ) {
     let transform = player_query.into_inner();
 
     if transform.translation.y < -BG_IMG_DIMENSIONS.1 / 2.0 - 30.0 {
+        // Send die sound event
+        audio_events.write(AudioEvent::Die);
         app_state.set(AppState::GameOver);
     }
 }
@@ -358,12 +390,15 @@ fn apply_gravity(
 fn handle_jump_input(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut player_query: Query<&mut Velocity, With<Player>>,
+    mut audio_events: EventWriter<AudioEvent>,
 ) {
     // Jump
     if keyboard.just_pressed(KeyCode::Space) {
         for mut velocity in &mut player_query {
             *velocity = Velocity(JUMP_IMPULSE)
         }
+        // Send wing sound event
+        audio_events.write(AudioEvent::Wing);
     }
 }
 
@@ -444,6 +479,7 @@ fn update_score(
     pipe_pairs_query: Query<&Transform, With<PipePair>>,
     mut score: ResMut<Score>,
     score_text_query: Single<&mut Text, With<ScoreText>>,
+    mut audio_events: EventWriter<AudioEvent>,
 ) {
     let player = player_query.into_inner();
     let mut score_text = score_text_query.into_inner();
@@ -454,6 +490,8 @@ fn update_score(
         if player.translation.x == threshold {
             score.0 += 1;
             *score_text = Text(score.0.to_string());
+            // Send point sound event
+            audio_events.send(AudioEvent::Point);
         }
     }
 }
@@ -585,4 +623,39 @@ fn cleanup(
 
     let game_over = game_over_query.into_inner();
     commands.entity(game_over).despawn();
+}
+
+fn play_audio_events(
+    mut audio_events: EventReader<AudioEvent>,
+    game_sounds: Res<GameSounds>,
+    mut commands: Commands,
+) {
+    for event in audio_events.read() {
+        match event {
+            AudioEvent::Wing => {
+                commands.spawn((
+                    AudioPlayer::new(game_sounds.wing.clone()),
+                    PlaybackSettings::ONCE,
+                ));
+            }
+            AudioEvent::Point => {
+                commands.spawn((
+                    AudioPlayer::new(game_sounds.point.clone()),
+                    PlaybackSettings::ONCE,
+                ));
+            }
+            AudioEvent::Hit => {
+                commands.spawn((
+                    AudioPlayer::new(game_sounds.hit.clone()),
+                    PlaybackSettings::ONCE,
+                ));
+            }
+            AudioEvent::Die => {
+                commands.spawn((
+                    AudioPlayer::new(game_sounds.die.clone()),
+                    PlaybackSettings::ONCE,
+                ));
+            }
+        }
+    }
 }
