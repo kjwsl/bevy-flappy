@@ -48,6 +48,12 @@ const MIN_PIPE_GAP: f32 = 100.0;
 
 const INITIAL_PIPE_INTERVAL: f32 = 3.0;
 
+// Collision detection constants
+const PLAYER_COLLISION_WIDTH: f32 = 24.0;
+const PLAYER_COLLISION_HEIGHT: f32 = 24.0;
+const PIPE_COLLISION_WIDTH: f32 = 52.0;
+const PIPE_COLLISION_HEIGHT: f32 = 320.0;
+
 #[derive(Resource)]
 pub struct PipeInterval(Timer);
 
@@ -85,6 +91,7 @@ impl Plugin for GamePlugin {
                     move_bg,
                     apply_gravity,
                     handle_jump_input,
+                    detect_collisions,
                     detect_gameover,
                     generate_pipes,
                     move_pipes,
@@ -184,6 +191,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>, score: ResMut<S
             Transform::from_xyz(-150., 70., Z_POS_PLAYER),
             Velocity(0.),
             Player,
+            Collider, // Add collider to player
         ));
 
         // Background & Platform
@@ -245,6 +253,40 @@ fn setup_ui(mut commands: Commands, mut score: ResMut<Score>) {
             },
         ));
     });
+}
+
+fn detect_collisions(
+    player_query: Single<&GlobalTransform, (With<Player>, With<Collider>)>,
+    pipe_query: Query<&GlobalTransform, (With<Pipe>, With<Collider>)>,
+    mut app_state: ResMut<NextState<AppState>>,
+) {
+    let player_transform = player_query.into_inner();
+
+    for pipe_transform in &pipe_query {
+        if check_collision(player_transform, pipe_transform) {
+            app_state.set(AppState::GameOver);
+            return;
+        }
+    }
+}
+
+fn check_collision(player_transform: &GlobalTransform, pipe_transform: &GlobalTransform) -> bool {
+    // Simple AABB collision detection using world coordinates
+    let player_left = player_transform.translation().x - PLAYER_COLLISION_WIDTH / 2.0;
+    let player_right = player_transform.translation().x + PLAYER_COLLISION_WIDTH / 2.0;
+    let player_top = player_transform.translation().y + PLAYER_COLLISION_HEIGHT / 2.0;
+    let player_bottom = player_transform.translation().y - PLAYER_COLLISION_HEIGHT / 2.0;
+
+    let pipe_left = pipe_transform.translation().x - PIPE_COLLISION_WIDTH / 2.0;
+    let pipe_right = pipe_transform.translation().x + PIPE_COLLISION_WIDTH / 2.0;
+    let pipe_top = pipe_transform.translation().y + PIPE_COLLISION_HEIGHT / 2.0;
+    let pipe_bottom = pipe_transform.translation().y - PIPE_COLLISION_HEIGHT / 2.0;
+
+    // Check if rectangles overlap
+    player_left < pipe_right
+        && player_right > pipe_left
+        && player_top > pipe_bottom
+        && player_bottom < pipe_top
 }
 
 fn detect_gameover(
@@ -389,10 +431,7 @@ fn destory_pipes(mut commands: Commands, query: Query<(Entity, &Transform), With
     }
 }
 
-fn handle_collision(collider_query: Query<(Entity, &Transform, &Sprite), With<Collider>>) {
-    for (entity, transform, sprite) in &collider_query {}
-    todo!()
-}
+
 
 fn move_pipes(mut query: Query<(&mut Transform, &PipePair)>) {
     for (mut transform, _) in &mut query {
