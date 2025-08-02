@@ -29,6 +29,8 @@ const Z_POS_PLATFORM: f32 = -3.0;
 const Z_POS_PIPE: f32 = -4.0;
 const Z_POS_PLAYER: f32 = 10.0;
 
+const MAX_PLAYER_ROTATION: f32 = 25.0;
+
 const BG_SPEED: f32 = 0.2;
 const PLATFORM_SPEED: f32 = 1.0;
 const PIPE_SPEED: f32 = 1.0;
@@ -294,6 +296,12 @@ fn apply_gravity(
             transform.translation.y = MAX_HEIGHT;
             **velocity = 0.0;
         }
+
+        transform.rotation =
+            Quat::from_rotation_z((**velocity / MAX_FALL_SPEED.abs() * 1.5).clamp(
+                -MAX_PLAYER_ROTATION.to_radians(),
+                MAX_PLAYER_ROTATION.to_radians(),
+            ));
 
         sprite.image = if **velocity > 150.0 {
             textures.up.clone()
