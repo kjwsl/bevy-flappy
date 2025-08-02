@@ -39,8 +39,8 @@ pub const MAX_HEIGHT: f32 = GAME_DIMENSIONS.1 / 2.0;
 pub const PIPE_WIDTH: f32 = 52.0;
 pub const PIPE_HEIGHT: f32 = 320.0;
 pub const PIPE_LEGROOM: f32 = 100.0;
-pub const MAX_PIPE_GAP: f32 = 200.0;
-pub const MIN_PIPE_GAP: f32 = 100.0;
+pub const MAX_PIPE_GAP: f32 = 250.0;
+pub const MIN_PIPE_GAP: f32 = 150.0;
 
 pub const INITIAL_PIPE_INTERVAL: f32 = 3.0;
 

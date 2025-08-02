@@ -17,6 +17,7 @@ impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(PipeInterval::default())
             .insert_resource(Score::default())
+            .insert_resource(Difficulty::default())
             .add_event::<AudioEvent>()
             .add_systems(OnEnter(AppState::InGame), (setup, setup_ui, play_background_music))
             .add_systems(
