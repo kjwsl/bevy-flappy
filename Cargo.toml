@@ -5,5 +5,5 @@ edition = "2024"
 
 [dependencies]
 bevy = "0.16.1"
-bevy-flappy-macros = { path = "./bevy-flappy-macros" }
 rand = "0.9"
+bevy-flappy-macros = { path = "./bevy-flappy-macros" }

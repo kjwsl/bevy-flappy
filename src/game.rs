@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
-use bevy::{prelude::*, text::LineHeight};
+use bevy::prelude::*;
+use bevy::text::LineHeight;
 use bevy_flappy_macros::hex_to_color;
 use rand::Rng;
 
@@ -71,21 +72,52 @@ pub enum GameOverMenuButton {
 
 pub struct GamePlugin;
 
-#[derive(Component)]
-pub struct GameScene;
+impl Plugin for GamePlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(PipeInterval::default())
+            .insert_resource(Score::default())
+            .add_systems(OnEnter(AppState::InGame), (setup, setup_ui))
+            .add_systems(
+                Update,
+                (
+                    move_bg,
+                    apply_gravity,
+                    handle_jump_input,
+                    detect_gameover,
+                    generate_pipes,
+                    move_pipes,
+                    destory_pipes,
+                    update_score,
+                )
+                    .run_if(in_state(AppState::InGame)),
+            )
+            .add_systems(OnEnter(AppState::GameOver), setup_gameover)
+            .add_systems(
+                Update,
+                (handle_gameover_menu_button).run_if(in_state(AppState::GameOver)),
+            )
+            .add_systems(OnExit(AppState::GameOver), cleanup);
+    }
+}
 
 #[derive(Component)]
-pub struct GameOverLayer;
+struct GameWorld;
 
 #[derive(Component)]
-pub struct BackgroundImage;
+struct GameUi;
 
 #[derive(Component)]
-pub struct PlatformImage;
+struct GameOverLayer;
+
+#[derive(Component)]
+struct BackgroundImage;
+
+#[derive(Component)]
+struct PlatformImage;
 
 #[derive(Component)]
 #[require(Sprite, Transform)]
-pub struct Player;
+struct Player;
 
 #[derive(Component, Deref, DerefMut)]
 struct Velocity(pub f32);
@@ -100,9 +132,19 @@ struct BirdTextures {
     down: Handle<Image>,
 }
 
+#[derive(Resource, Clone, Default)]
+struct Score(u32);
+
+#[derive(Component, Clone)]
+#[require(Text)]
+struct ScoreText;
+
 #[derive(Component, Clone)]
 #[require(Sprite, Transform, Collider)]
 struct Pipe;
+
+#[derive(Component, Clone)]
+struct PipePair;
 
 #[derive(Resource, Clone)]
 struct PipeTextures {
@@ -110,32 +152,7 @@ struct PipeTextures {
     red_pipe: Handle<Image>,
 }
 
-impl Plugin for GamePlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(PipeInterval::default())
-            .add_systems(OnEnter(AppState::InGame), setup)
-            .add_systems(
-                Update,
-                (
-                    move_bg,
-                    apply_gravity,
-                    handle_jump_input,
-                    detect_gameover,
-                    generate_pipes,
-                    move_pipes,
-                )
-                    .run_if(in_state(AppState::InGame)),
-            )
-            .add_systems(OnEnter(AppState::GameOver), setup_gameover)
-            .add_systems(
-                Update,
-                (handle_gameover_menu_button).run_if(in_state(AppState::GameOver)),
-            )
-            .add_systems(OnExit(AppState::GameOver), cleanup);
-    }
-}
-
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>, score: ResMut<Score>) {
     let bird_textures = BirdTextures {
         up: asset_server.load("sprites/yellowbird-upflap.png"),
         mid: asset_server.load("sprites/yellowbird-midflap.png"),
@@ -152,7 +169,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(pipe_texture);
 
     let root = commands
-        .spawn((GameScene, Transform::default(), Visibility::Visible))
+        .spawn((GameWorld, Transform::default(), Visibility::Visible))
         .id();
 
     commands.entity(root).with_children(|parent| {
@@ -187,6 +204,44 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
                 PlatformImage,
             ));
         }
+    });
+}
+
+fn setup_ui(mut commands: Commands, mut score: ResMut<Score>) {
+    score.0 = 0;
+    let root = commands
+        .spawn((
+            GameUi,
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                ..default()
+            },
+        ))
+        .id();
+
+    commands.entity(root).with_children(|parent| {
+        // Score
+        parent.spawn((
+            ScoreText,
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(10.0),
+                left: Val::Px(30.0),
+                ..default()
+            },
+            Text(score.0.to_string()),
+            TextFont {
+                font_size: 50.0,
+                line_height: LineHeight::RelativeToFont(2.0),
+                ..default()
+            },
+            TextColor(Color::WHITE),
+            TextShadow {
+                offset: Vec2::splat(0.8),
+                color: Color::BLACK,
+            },
+        ));
     });
 }
 
@@ -267,7 +322,7 @@ fn generate_pipes(
     pipe_textures: Res<PipeTextures>,
     mut interval: ResMut<PipeInterval>,
     time: Res<Time>,
-    root_query: Query<Entity, With<GameScene>>,
+    root_query: Query<Entity, With<GameWorld>>,
 ) {
     let root = root_query.single().expect("Game scene not found");
 
@@ -284,48 +339,75 @@ fn generate_pipes(
 
         let pipe_offset = pipe_gap / 2.0 + PIPE_HEIGHT / 2.0;
         commands.entity(root).with_children(|parent| {
-            // Bottom pipe
             parent.spawn((
-                Pipe,
-                Sprite {
-                    image: pipe_textures.green_pipe.clone(),
-                    ..default()
-                },
-                Transform::from_xyz(
-                    BG_IMG_DIMENSIONS.0 + PIPE_WIDTH / 2.0,
-                    new_y - pipe_offset,
-                    Z_POS_PIPE,
-                ),
-                Collider,
-            ));
-
-            // Top pipe
-            parent.spawn((
-                Pipe,
-                Sprite {
-                    image: pipe_textures.green_pipe.clone(),
-                    ..default()
-                },
-                Transform {
-                    translation: Vec3::new(
-                        BG_IMG_DIMENSIONS.0 + PIPE_WIDTH / 2.0,
-                        new_y + pipe_offset,
-                        Z_POS_PIPE,
+                PipePair,
+                Transform::from_xyz(BG_IMG_DIMENSIONS.0 + PIPE_WIDTH / 2.0, new_y, Z_POS_PIPE),
+                Visibility::Visible,
+                children![
+                    (
+                        Pipe,
+                        Sprite {
+                            image: pipe_textures.green_pipe.clone(),
+                            ..default()
+                        },
+                        Transform::from_xyz(0., -pipe_offset, 0.,),
+                        Collider,
                     ),
-                    rotation: Quat::from_rotation_x(PI),
-                    ..default()
-                },
-                Collider,
+                    (
+                        Pipe,
+                        Sprite {
+                            image: pipe_textures.green_pipe.clone(),
+                            ..default()
+                        },
+                        Transform {
+                            translation: Vec3::new(0., pipe_offset, 0.,),
+                            rotation: Quat::from_rotation_x(PI),
+                            ..default()
+                        },
+                        Collider,
+                    )
+                ],
             ));
         });
     }
 }
 
-fn handle_collision(collider_query: Query<(Entity, &Transform), With<Collider>>) {}
+fn destory_pipes(mut commands: Commands, query: Query<(Entity, &Transform), With<Pipe>>) {
+    let threshold = -GAME_DIMENSIONS.0 / 2.0 - PIPE_WIDTH / 2.0;
+    for (entity, transform) in &query {
+        if transform.translation.x < threshold {
+            commands.entity(entity).despawn();
+        }
+    }
+}
 
-fn move_pipes(mut query: Query<(&mut Transform, &Pipe)>) {
+fn handle_collision(collider_query: Query<(Entity, &Transform, &Sprite), With<Collider>>) {
+    for (entity, transform, sprite) in &collider_query {}
+    todo!()
+}
+
+fn move_pipes(mut query: Query<(&mut Transform, &PipePair)>) {
     for (mut transform, _) in &mut query {
         transform.translation.x -= PIPE_SPEED;
+    }
+}
+
+fn update_score(
+    player_query: Single<&Transform, With<Player>>,
+    pipe_pairs_query: Query<&Transform, With<PipePair>>,
+    mut score: ResMut<Score>,
+    score_text_query: Single<&mut Text, With<ScoreText>>,
+) {
+    let player = player_query.into_inner();
+    let mut score_text = score_text_query.into_inner();
+
+    for transform in &pipe_pairs_query {
+        let threshold = transform.translation.x + PIPE_WIDTH / 2.0;
+
+        if player.translation.x == threshold {
+            score.0 += 1;
+            *score_text = Text(score.0.to_string());
+        }
     }
 }
 
@@ -444,14 +526,16 @@ fn handle_gameover_menu_button(
 
 fn cleanup(
     mut commands: Commands,
-    game_query: Query<Entity, With<GameScene>>,
-    game_over_query: Query<Entity, With<GameOverLayer>>,
+    game_world_query: Single<Entity, With<GameWorld>>,
+    game_ui_query: Single<Entity, With<GameUi>>,
+    game_over_query: Single<Entity, With<GameOverLayer>>,
 ) {
-    for entity in &game_query {
-        commands.entity(entity).despawn();
-    }
+    let world = game_world_query.into_inner();
+    commands.entity(world).despawn();
 
-    for entity in &game_over_query {
-        commands.entity(entity).despawn();
-    }
+    let ui = game_ui_query.into_inner();
+    commands.entity(ui).despawn();
+
+    let game_over = game_over_query.into_inner();
+    commands.entity(game_over).despawn();
 }
